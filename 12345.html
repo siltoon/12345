@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NumberBrick Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6c5ce7; 
+            --secondary: #a29bfe;
+            --accent: #fd79a8;
+            --dark: #2d3436;
+            --light: #f5f6fa;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        /* ... (All CSS styles from previous correct version) ... */
+        .brick.dragging { opacity: 0.7; transform: scale(1.1); cursor: grabbing; z-index: 1000; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 20px; box-sizing: border-box; }
+        .game-container { background: white; border-radius: 20px; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); padding: 30px; width: 100%; max-width: 600px; text-align: center; transition: all 0.3s ease; position: relative;  }
+        .game-title { color: var(--primary); font-size: 2.5rem; margin-bottom: 30px; font-weight: 700; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); }
+        .brick-row { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap; min-height: 80px;  }
+        .brick { background: var(--primary); color: white; width: 80px; height: 80px; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 2rem; font-weight: bold; cursor: grab; transition: all 0.3s ease, opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4); position: relative; overflow: hidden; }
+        .brick::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: linear-gradient( to bottom right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60% ); transform: rotate(30deg); transition: all 0.3s ease; }
+        .brick:hover:not(.dragging):not(.unary-drop-target-active) { transform: translateY(-5px) scale(1.05); box-shadow: 0 8px 20px rgba(108, 92, 231, 0.6); }
+        .brick:hover::before { transform: rotate(30deg) translate(10px, 10px); }
+        .brick.red { background: #ff7675; box-shadow: 0 5px 15px rgba(255, 118, 117, 0.4); color: white; }
+        .brick.operator { background: #00b894; box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4); color: white; }
+        .brick.operator.unary#abs-operator { background-color: #f39c12;  box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4); }
+        .brick.operator.unary#sqr-operator { background-color: #3498db;  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4); }
+        .brick.operator.unary#fact-operator { background-color: #9b59b6; box-shadow: 0 5px 15px rgba(155, 89, 182, 0.4); }
+        .brick.operator.unary#cube-operator { background-color: #2ecc71; box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4); }
+        .brick.operator.unary#quint-operator { background-color: #e67e22; box-shadow: 0 5px 15px rgba(230, 126, 34, 0.4); }
+        .brick.operator.unary#tenx-operator { background-color: #1abc9c; box-shadow: 0 5px 15px rgba(26, 188, 156, 0.4); }
+        .brick.unary-drop-target-active { /* Flag class */ }
+        .brick.unary-drop-target-active.abs-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #f39c12, 0 8px 20px rgba(243, 156, 18, 0.6) !important; }
+        .brick.unary-drop-target-active.sqr-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #3498db, 0 8px 20px rgba(52, 152, 219, 0.6) !important; }
+        .brick.unary-drop-target-active.fact-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #9b59b6, 0 8px 20px rgba(155, 89, 182, 0.6) !important; }
+        .brick.unary-drop-target-active.cube-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #2ecc71, 0 8px 20px rgba(46, 204, 113, 0.6) !important; }
+        .brick.unary-drop-target-active.quint-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #e67e22, 0 8px 20px rgba(230, 126, 34, 0.6) !important; }
+        .brick.unary-drop-target-active.tenx-unary-drop-highlight { transform: scale(1.1) translateY(-3px); box-shadow: 0 0 0 4px #1abc9c, 0 8px 20px rgba(26, 188, 156, 0.6) !important; }
+        .game-controls { margin-top: 25px; margin-bottom: 15px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; position: relative; z-index: 5; } 
+        .game-message { margin-top: 0; font-size: 1.2rem; color: var(--dark); opacity: 0.8; transition: opacity 0.3s ease, display 0.3s ease; min-height: 2em; padding-top: 5px; }
+        .drop-zone { background: rgba(253, 121, 168, 0.2); border: 2px dashed var(--accent); border-radius: 8px; transition: all 0.2s ease; }
+        .drop-zone:hover, .drop-zone.drop-target-hover { background: rgba(253, 121, 168, 0.5); transform: scale(1.05); }
+        .game-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; opacity: 0; visibility: hidden; transition: opacity 0.4s ease-in-out, visibility 0s linear 0.4s; border-radius: 20px; }
+        .game-overlay.show { opacity: 1; visibility: visible; transition: opacity 0.4s ease-in-out, visibility 0s linear 0s; }
+        .overlay-message { font-size: 2.5rem; font-weight: bold; margin-bottom: 25px; text-align: center; padding: 0 20px; }
+        .overlay-message.lose { color: #e74c3c; }
+        .restart-button { padding: 12px 25px; font-size: 1.1rem; color: white; background-color: var(--primary); border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .restart-button:hover { background-color: #5849c4; transform: translateY(-2px); }
+        .control-button { padding: 8px 15px; font-size: 0.9rem; color: white; background-color: var(--secondary); border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 3px 8px rgba(0,0,0,0.1); -webkit-appearance: none; appearance: none; }
+        .control-button:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .control-button.red-button { background-color: #e74c3c; }
+        .control-button.red-button:hover { background-color: #c0392b; }
+        @media (max-width: 600px) { .brick { width: 55px; height: 55px; font-size: 1.3rem; gap: 8px } .game-title { font-size: 2rem; } .brick-row { gap: 8px; min-height: 55px; } .overlay-message { font-size: 1.8rem; } .restart-button { font-size: 1rem; padding: 10px 20px;} .control-button { font-size: 0.8rem; padding: 7px 12px; } .game-controls { gap: 8px; } }
+        @media (max-width: 480px) { /* Adjusted for 5 number bricks + potential operators */
+            .brick { width: 48px; height: 48px; font-size: 1.1rem; margin: 2px !important; } 
+            .brick-row { gap: 5px; margin-bottom: 10px;}
+            .game-controls { gap: 5px; }
+            .control-button { padding: 6px 10px; font-size: 0.75rem;}
+        }
+         @media (max-width: 400px) { 
+            .brick { width: 45px; height: 45px; font-size: 1rem; } 
+            .brick-row { gap: 4px; min-height: 45px;} 
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">NumberBrick</h1>
+        <div class="brick-row"><div class="brick red" id="target-brick">0</div></div>
+        <div class="brick-row" id="number-row-1"></div>
+        <div class="brick-row" id="operator-row">
+            <div class="brick operator">+</div> <div class="brick operator">-</div> <div class="brick operator">×</div>
+            <div class="brick operator unary" id="abs-operator" style="display: none;">|x|</div>
+            <div class="brick operator unary" id="sqr-operator" style="display: none;">x²</div>
+            <div class="brick operator unary" id="fact-operator" style="display: none;">n!</div>
+            <div class="brick operator unary" id="cube-operator" style="display: none;">x³</div>
+            <div class="brick operator unary" id="quint-operator" style="display: none;">x⁵</div>
+            <div class="brick operator unary" id="tenx-operator" style="display: none;">10x</div>
+        </div>
+        <div class="game-controls">
+            <button id="restart-current-target-button" class="control-button">Restart Target</button>
+            <button id="reset-progress-button" class="control-button red-button">Reset All Progress</button>
+        </div>
+        <p class="game-message"></p>
+        <div class="game-overlay" id="game-end-overlay">
+            <div class="overlay-message" id="overlay-message-text"></div>
+            <button class="restart-button" id="overlay-restart-button">Try Again?</button>
+        </div>
+    </div>
+
+    <script>
+        function saveProgress(targetValue) { try { localStorage.setItem("numberBrickTarget", targetValue.toString()); } catch (e) { console.error("SAVE ERROR:", e); }}
+        function loadProgress() { try { const s = localStorage.getItem("numberBrickTarget"); if (s !== null && !isNaN(parseInt(s))) return parseInt(s); } catch (e) { console.error("LOAD ERROR:", e); } return 0; }
+        function clearProgress() { try { localStorage.removeItem("numberBrickTarget"); } catch (e) { console.error("CLEAR ERROR:", e); }}
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameContainer = document.querySelector('.game-container');
+            let draggedBrick = null; 
+            let activeDropZones = [];
+            
+            const gameMessageElement = document.querySelector('.game-message');
+            const targetBrickDisplay = document.getElementById('target-brick');
+            const numberRow = document.getElementById('number-row-1');
+            const absOperatorBrick = document.getElementById('abs-operator'); 
+            const sqrOperatorBrick = document.getElementById('sqr-operator');
+            const factOperatorBrick = document.getElementById('fact-operator');
+            const cubeOperatorBrick = document.getElementById('cube-operator');
+            const quintOperatorBrick = document.getElementById('quint-operator');
+            const tenxOperatorBrick = document.getElementById('tenx-operator');
+
+            const gameEndOverlay = document.getElementById('game-end-overlay');
+            const overlayMessageText = document.getElementById('overlay-message-text');
+            const overlayRestartButton = document.getElementById('overlay-restart-button');
+            const restartCurrentTargetButton = document.getElementById('restart-current-target-button');
+            const resetProgressButton = document.getElementById('reset-progress-button');
+
+            let currentTargetValue = 0;
+            let gameEnded = false;
+            const ABS_OPERATOR_THRESHOLD = 7; 
+            const SQR_OPERATOR_THRESHOLD = 17;
+            const FACT_OPERATOR_THRESHOLD = 103; 
+            const CUBE_OPERATOR_THRESHOLD = 182;
+            const QUINT_OPERATOR_THRESHOLD = 813;
+            const TENX_OPERATOR_THRESHOLD = 850;
+            const MAX_FACTORIAL_INPUT = 10;
+            const MAX_POWER_BASE = 100; 
+
+            currentTargetValue = loadProgress();
+            const urlParams = new URLSearchParams(window.location.search);
+            const xyztParam = urlParams.get('xyzt');
+            if (xyztParam !== null) {
+                const targetFromUrl = parseInt(xyztParam);
+                if (!isNaN(targetFromUrl) && targetFromUrl >= 0) {
+                    currentTargetValue = targetFromUrl;
+                }
+            }
+            
+            function factorial(n) { /* ... same ... */ }
+            function createBrickElement(text, classes = ['brick']) { /* ... same ... */ }
+            function initializeBrick(brick, isOperator = false, forceAnimate = false) { /* ... same ... */ }
+            // (Pasting these three for completeness)
+            function factorial(n) {
+                if (n < 0) return NaN; 
+                if (n === 0 || n === 1) return 1;
+                if (n > MAX_FACTORIAL_INPUT) return n; 
+                let result = 1;
+                for (let i = 2; i <= n; i++) { result *= i; }
+                return result;
+            }
+            function createBrickElement(text, classes = ['brick']) {
+                const brick = document.createElement('div');
+                classes.forEach(cls => brick.classList.add(cls));
+                brick.textContent = text;
+                return brick;
+            }
+            function initializeBrick(brick, isOperator = false, forceAnimate = false) {
+                brick.removeEventListener('dragstart', handleDragStart);
+                brick.removeEventListener('dragend', handleDragEnd);
+                brick.setAttribute('draggable', 'true');
+                brick.style.cursor = 'grab';
+                brick.addEventListener('dragstart', handleDragStart);
+                brick.addEventListener('dragend', handleDragEnd);
+                const wasAnimatedOnce = brick.getAttribute('data-animated-once') === 'true';
+                if (forceAnimate || !isOperator || (isOperator && !wasAnimatedOnce)) {
+                    brick.style.opacity = '0';
+                    brick.style.transform = 'translateY(20px)';
+                    setTimeout(() => {
+                        brick.style.opacity = '1';
+                        brick.style.transform = 'translateY(0)';
+                        if (isOperator) brick.setAttribute('data-animated-once', 'true');
+                    }, Math.random() * 150 + 50);
+                } else { 
+                     brick.style.opacity = '1';
+                     brick.style.transform = 'translateY(0)';
+                }
+            }
+            
+            function setupNewRound() {
+                gameEnded = false; 
+                targetBrickDisplay.textContent = currentTargetValue;
+                targetBrickDisplay.style.boxShadow = "0 5px 15px rgba(255, 118, 117, 0.4)"; 
+                targetBrickDisplay.style.transform = "scale(1)";
+
+                numberRow.innerHTML = ''; 
+                // MODIFIED: Added '5' to initial numbers
+                const initialNumbers = ['1', '2', '3', '4', '5']; 
+                initialNumbers.forEach(numStr => {
+                    const newBrick = createBrickElement(numStr, ['brick']);
+                    numberRow.appendChild(newBrick);
+                    initializeBrick(newBrick, false, true);
+                });
+
+                document.querySelectorAll('.brick.operator:not(.unary), #target-brick').forEach(opBrick => {
+                    opBrick.removeAttribute('data-animated-once');
+                    initializeBrick(opBrick, true, true); 
+                });
+                
+                const setupUnaryOperator = (brickElement, threshold) => {
+                    const wasHidden = brickElement.style.display === 'none';
+                    if (currentTargetValue >= threshold) {
+                        brickElement.style.display = 'flex';
+                        if (wasHidden) brickElement.removeAttribute('data-animated-once');
+                        initializeBrick(brickElement, true, wasHidden); 
+                    } else {
+                        brickElement.style.display = 'none';
+                    }
+                };
+
+                setupUnaryOperator(absOperatorBrick, ABS_OPERATOR_THRESHOLD);
+                setupUnaryOperator(sqrOperatorBrick, SQR_OPERATOR_THRESHOLD);
+                setupUnaryOperator(factOperatorBrick, FACT_OPERATOR_THRESHOLD);
+                setupUnaryOperator(cubeOperatorBrick, CUBE_OPERATOR_THRESHOLD);
+                setupUnaryOperator(quintOperatorBrick, QUINT_OPERATOR_THRESHOLD);
+                setupUnaryOperator(tenxOperatorBrick, TENX_OPERATOR_THRESHOLD);
+
+                gameMessageElement.style.display = 'block';
+                gameMessageElement.innerHTML = `<i class="fas fa-lightbulb mr-2"></i> Combine numbers to make: <strong>${currentTargetValue}</strong>`;
+                gameEndOverlay.classList.remove('show');
+                removeAllActiveDropZones(); 
+                removeUnaryDropTargetListeners();
+            }
+            
+            function removeAllActiveDropZones() { /* ... same ... */ }
+            function removeUnaryDropTargetListeners() { /* ... same ... */ }
+            function handleDragStart(e) { /* ... same ... */ }
+            function handleDragEnd() { /* ... same ... */ }
+            function handleUnaryDragOver(e) { /* ... same ... */ }
+            function handleUnaryDragLeave(e) { /* ... same ... */ }
+            function handleUnaryDrop(e) { /* ... same ... */ }
+            function createDropZoneElement(brick1, brick2) { /* ... same ... */ }
+            function performOperation(operandBrick1, operandBrick2, operatorBrick) { /* ... same ... */ }
+            function checkWinCondition() { /* ... This is the version from your last "perfect" request ... */ }
+            function endGame(isWin) { /* ... same ... */ }
+            // (Pasting all these functions again for completeness)
+            function removeAllActiveDropZones() { 
+                 activeDropZones.forEach(zone => { if (zone && zone.parentNode) zone.parentNode.removeChild(zone); });
+                activeDropZones = [];
+            }
+            function removeUnaryDropTargetListeners() {
+                numberRow.querySelectorAll('.brick.unary-drop-target-active').forEach(nb => {
+                    nb.classList.remove('unary-drop-target-active', 'abs-unary-drop-highlight', 'sqr-unary-drop-highlight', 'fact-unary-drop-highlight', 'cube-unary-drop-highlight', 'quint-unary-drop-highlight', 'tenx-unary-drop-highlight');
+                    nb.removeEventListener('dragover', handleUnaryDragOver);
+                    nb.removeEventListener('dragleave', handleUnaryDragLeave);
+                    nb.removeEventListener('drop', handleUnaryDrop);
+                });
+            }
+            function handleDragStart(e) {
+                if (gameEnded) { e.preventDefault(); return; }
+                draggedBrick = this; 
+                this.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', this.textContent || 'brick');
+                e.dataTransfer.effectAllowed = 'move';
+                removeAllActiveDropZones(); removeUnaryDropTargetListeners();
+                if (this.classList.contains('unary')) {
+                    numberRow.querySelectorAll('.brick:not(.operator):not(.red)').forEach(nB => {
+                        nB.classList.add('unary-drop-target-active');
+                        nB.addEventListener('dragover', handleUnaryDragOver);
+                        nB.addEventListener('dragleave', handleUnaryDragLeave);
+                        nB.addEventListener('drop', handleUnaryDrop);
+                    });
+                } else if (this.classList.contains('operator')) { 
+                    const nBs = Array.from(numberRow.querySelectorAll('.brick:not(.operator):not(.red)'));
+                    if (nBs.length < 2) return;
+                    for (let i = 0; i < nBs.length - 1; i++) {
+                        const b1 = nBs[i], b2 = nBs[i+1];
+                        const dzEl = createDropZoneElement(b1,b2); 
+                        if (dzEl) activeDropZones.push(dzEl);
+                    }
+                }
+            }
+            function handleDragEnd() { 
+                if (draggedBrick) { draggedBrick.classList.remove('dragging'); }
+                removeUnaryDropTargetListeners(); removeAllActiveDropZones(); 
+                draggedBrick = null; 
+            }
+            function handleUnaryDragOver(e) {
+                e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+                if (!draggedBrick) return;
+                this.classList.remove('abs-unary-drop-highlight', 'sqr-unary-drop-highlight', 'fact-unary-drop-highlight', 'cube-unary-drop-highlight', 'quint-unary-drop-highlight', 'tenx-unary-drop-highlight');
+                if (draggedBrick.id === 'abs-operator') this.classList.add('abs-unary-drop-highlight');
+                else if (draggedBrick.id === 'sqr-operator') this.classList.add('sqr-unary-drop-highlight');
+                else if (draggedBrick.id === 'fact-operator') this.classList.add('fact-unary-drop-highlight');
+                else if (draggedBrick.id === 'cube-operator') this.classList.add('cube-unary-drop-highlight');
+                else if (draggedBrick.id === 'quint-operator') this.classList.add('quint-unary-drop-highlight');
+                else if (draggedBrick.id === 'tenx-operator') this.classList.add('tenx-unary-drop-highlight');
+            }
+            function handleUnaryDragLeave(e) {
+                this.classList.remove('abs-unary-drop-highlight', 'sqr-unary-drop-highlight', 'fact-unary-drop-highlight', 'cube-unary-drop-highlight', 'quint-unary-drop-highlight', 'tenx-unary-drop-highlight');
+            }
+            function handleUnaryDrop(e) {
+                e.preventDefault();
+                if (gameEnded || !draggedBrick || !draggedBrick.classList.contains('unary')) return;
+                const targetNumberBrick = this;
+                targetNumberBrick.classList.remove('abs-unary-drop-highlight', 'sqr-unary-drop-highlight', 'fact-unary-drop-highlight', 'cube-unary-drop-highlight', 'quint-unary-drop-highlight', 'tenx-unary-drop-highlight');
+                const currentValue = parseInt(targetNumberBrick.textContent);
+                if (isNaN(currentValue)) return;
+                let newValue; let highlightColor = ''; let operationSuccess = true;
+                switch (draggedBrick.id) {
+                    case 'abs-operator': newValue = Math.abs(currentValue); highlightColor = '#f39c12'; break;
+                    case 'sqr-operator': newValue = currentValue * currentValue; highlightColor = '#3498db'; break;
+                    case 'fact-operator': newValue = factorial(currentValue); if (isNaN(newValue) || (newValue === currentValue && currentValue > 1 && currentValue <= MAX_FACTORIAL_INPUT) ) { if (!(currentValue > 1 && currentValue <=MAX_FACTORIAL_INPUT && newValue === currentValue)) { operationSuccess = false; }} highlightColor = '#9b59b6'; break;
+                    case 'cube-operator': if (Math.abs(currentValue) > MAX_POWER_BASE && currentValue !== 0 && currentValue !== 1 && currentValue !== -1) { newValue = currentValue; operationSuccess = false; } else { newValue = currentValue * currentValue * currentValue; } highlightColor = '#2ecc71'; break;
+                    case 'quint-operator': if (Math.abs(currentValue) > MAX_POWER_BASE && currentValue !== 0 && currentValue !== 1 && currentValue !== -1) { newValue = currentValue; operationSuccess = false; } else { newValue = Math.pow(currentValue, 5); } highlightColor = '#e67e22'; break;
+                    case 'tenx-operator': newValue = currentValue * 10; highlightColor = '#1abc9c'; break;
+                    default: return; 
+                }
+                if (operationSuccess) {
+                    targetNumberBrick.textContent = newValue; targetNumberBrick.style.transform = 'scale(0.8)';
+                    if (highlightColor) targetNumberBrick.style.backgroundColor = highlightColor;
+                    setTimeout(() => { targetNumberBrick.style.transform = 'scale(1.2)'; targetNumberBrick.style.backgroundColor = ''; setTimeout(() => { targetNumberBrick.style.transform = 'scale(1)'; checkWinCondition(); }, 150); }, 100);
+                } else { targetNumberBrick.style.transition = 'transform 0.1s ease-in-out'; targetNumberBrick.style.transform = 'translateX(-5px)'; setTimeout(() => { targetNumberBrick.style.transform = 'translateX(5px)'; setTimeout(() => { targetNumberBrick.style.transform = 'translateX(0px)'; }, 100); }, 100); }
+            }
+            function createDropZoneElement(brick1, brick2) { 
+                if (!brick1 || !brick2 || !brick1.parentNode || !brick2.parentNode || brick1.parentNode !== brick2.parentNode) return null;
+                const gameContainerRect = gameContainer.getBoundingClientRect();
+                const rect1 = brick1.getBoundingClientRect();
+                const rect2 = brick2.getBoundingClientRect();
+                const dropZoneEl = document.createElement('div');
+                dropZoneEl.className = 'drop-zone'; dropZoneEl.style.position = 'absolute'; dropZoneEl.style.width = '40px'; dropZoneEl.style.height = `${rect1.height}px`; dropZoneEl.style.zIndex = '50';
+                const midPointX_viewport = (rect1.right + rect2.left) / 2; const topY_viewport = rect1.top;
+                const dropZoneLeft_relative = midPointX_viewport - gameContainerRect.left - (parseFloat(dropZoneEl.style.width) / 2);
+                const dropZoneTop_relative = topY_viewport - gameContainerRect.top;
+                dropZoneEl.style.left = `${dropZoneLeft_relative}px`; dropZoneEl.style.top = `${dropZoneTop_relative}px`;
+                dropZoneEl.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dropZoneEl.classList.add('drop-target-hover'); });
+                dropZoneEl.addEventListener('dragleave', () => { dropZoneEl.classList.remove('drop-target-hover'); });
+                dropZoneEl.addEventListener('drop', (e) => {
+                    e.preventDefault(); if (gameEnded) return;
+                    dropZoneEl.classList.remove('drop-target-hover');
+                    if (draggedBrick && draggedBrick.classList.contains('operator') && !draggedBrick.classList.contains('unary')) {
+                        performOperation(brick1, brick2, draggedBrick);
+                    }
+                });
+                gameContainer.appendChild(dropZoneEl); return dropZoneEl;
+            }
+            function performOperation(operandBrick1, operandBrick2, operatorBrick) {
+                if (gameEnded) return;
+                const num1 = parseInt(operandBrick1.textContent), num2 = parseInt(operandBrick2.textContent);
+                const op = operatorBrick.textContent;
+                if (isNaN(num1) || isNaN(num2)) return;
+                let resultValue;
+                switch (op) { case '+': resultValue = num1 + num2; break; case '-': resultValue = num1 - num2; break; case '×': resultValue = num1 * num2; break; default: return; }
+                const newResultBrick = createBrickElement(resultValue.toString(), ['brick']);
+                initializeBrick(newResultBrick, false, true);
+                const parentRow = operandBrick1.parentNode;
+                try { parentRow.insertBefore(newResultBrick, operandBrick1); parentRow.removeChild(operandBrick1); parentRow.removeChild(operandBrick2); setTimeout(checkWinCondition, 300); } 
+                catch (error) { console.error("DOM Error:", error); if (newResultBrick.parentNode) newResultBrick.parentNode.removeChild(newResultBrick); }
+            }
+
+            function checkWinCondition() { // This is the version from your previous request
+                if (gameEnded) return; 
+                const remainingNumberBricks = Array.from(numberRow.querySelectorAll('.brick:not(.operator):not(.red)'));
+                
+                if (remainingNumberBricks.length === 1) {
+                    const lastBrickValue = parseInt(remainingNumberBricks[0].textContent);
+                    if (lastBrickValue === currentTargetValue) {
+                        endGame(true); // Win: Last brick matches target
+                    }
+                    // If it doesn't match, do nothing here. Let the game continue.
+                } else if (remainingNumberBricks.length === 0) {
+                    // No more manipulable number bricks left, and target wasn't met.
+                    endGame(false); // Lose: Ran out of numbers
+                }
+            }
+            
+            function endGame(isWin) { /* ... same ... */ }
+            // (Pasting endGame for completeness)
+            function endGame(isWin) {
+                gameEnded = true; 
+                removeAllActiveDropZones();
+                removeUnaryDropTargetListeners();
+                document.querySelectorAll('.brick').forEach(brick => {
+                    brick.setAttribute('draggable', 'false');
+                    brick.style.cursor = 'default';
+                });
+                if (isWin) {
+                    console.log(`Target ${currentTargetValue} reached!`);
+                    currentTargetValue++; 
+                    saveProgress(currentTargetValue); 
+                    targetBrickDisplay.style.boxShadow = "0 0 25px 10px #2ecc71"; 
+                    targetBrickDisplay.style.transform = "scale(1.15)";
+                    setTimeout(() => { setupNewRound(); }, 1200); 
+                } else { 
+                    overlayMessageText.textContent = `😥 TRY AGAIN FOR ${currentTargetValue} 😥`;
+                    overlayMessageText.className = 'overlay-message lose'; 
+                    const lastBrick = numberRow.querySelector('.brick:not(.operator):not(.red)');
+                    if (lastBrick) {
+                        lastBrick.style.boxShadow = "0 0 15px 5px #e74c3c";
+                        lastBrick.style.transform = "scale(1.1)";
+                    } else { targetBrickDisplay.style.boxShadow = "0 0 15px 5px #e74c3c"; }
+                    overlayRestartButton.textContent = "Try Again?"; 
+                    gameEndOverlay.classList.add('show');
+                    gameMessageElement.style.display = 'none'; 
+                }
+            }
+
+
+            overlayRestartButton.addEventListener('click', () => { setupNewRound(); });
+            restartCurrentTargetButton.addEventListener('click', () => {
+                if (gameEndOverlay.classList.contains('show')) gameEndOverlay.classList.remove('show');
+                setupNewRound(); 
+            });
+            resetProgressButton.addEventListener('click', () => {
+                if (confirm("Are you sure you want to reset all progress and start from target 0?")) {
+                    clearProgress(); currentTargetValue = 0;
+                    if (window.history.replaceState) { const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname; window.history.replaceState({path:cleanUrl},'',cleanUrl); }
+                    if (gameEndOverlay.classList.contains('show')) { gameEndOverlay.classList.remove('show'); }
+                    setupNewRound(); 
+                }
+            });
+
+            document.querySelectorAll('#target-brick, .brick.operator').forEach(brick => {
+                initializeBrick(brick, true, true);
+            });
+            setupNewRound();
+        });
+    </script> 
+</body>
+</html>
